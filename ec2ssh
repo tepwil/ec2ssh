@@ -1,0 +1,189 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Getopt::Long qw/:config pass_through/;
+use Pod::Usage;
+use JSON;
+
+sub describe_instances {
+  # Query using the AWS command line interface for a list of ec2 instances
+  # matching an $instance_name where $instance_name=tag:value and the 'tag:'
+  # portion is optional defaulting to 'Name'
+  my ($instance_name, $profile, $region, $filters, $debug)= @_;
+  my ($tag_name, $tag_value)
+    = $instance_name =~ /:/ 
+    ? split /:/, $instance_name
+    : ('Name', $instance_name);
+
+  my $cmd= 
+    "aws ec2 describe-instances --output json --color off --no-paginate";
+  $cmd.= " --filters Name=tag:$tag_name,Values=$tag_value" if $tag_value;
+  $cmd.= " --profile $profile" if $profile;
+  $cmd.= " --region $region" if $region;
+  $cmd.= " --filters $filters" if $filters;
+  print STDERR "Describing Instances\n\$ $cmd\n" if $debug;
+
+  my @instances;
+  my $reservations= `$cmd`;
+  die "External command failed: $cmd" if $?;
+  my $reservations_ref = from_json($reservations);
+  foreach my $reservation (@{$reservations_ref->{Reservations}}) {
+    foreach my $instance (@{$reservation->{Instances}}) {
+      my $public_dns= $instance->{PublicDnsName} || 'None';
+      my $private_dns= $instance->{PrivateDnsName} || 'None';
+      my $name = 'None';
+      foreach my $tag (@{$instance->{Tags}}) {
+        $name= $tag->{Value} if $tag->{Key} eq 'Name';
+      }
+      push @instances, join "\t", ($name, $public_dns, $private_dns);
+    }
+  }
+  return @instances;
+}
+
+my $help          = 0;
+my $valid_options = 0;
+my $debug         = 0;
+my $list          = 0;
+my $profile       = '';
+my $region        = '';
+my $filters       = '';
+my $private       = 0;
+$valid_options= GetOptions(
+  'help|?'    => \$help,
+  'debug|d'   => \$debug,
+  'list'      => \$list,
+  'profile=s' => \$profile,
+  'region=s'  => \$region,
+  'filters=s' => \$filters,
+  'private'   => \$private,
+);
+
+# Parse instance-name
+my $instance_parts= $ARGV[0] || '';
+my ($user, $instance_name);
+if ($instance_parts =~ m/\@/) {
+  ($user, $instance_name)= split /\@/, $instance_parts;
+}
+else {
+  $instance_name= $instance_parts;
+}
+pod2usage(
+  -verbose => 2, 
+  -noperldoc => 1
+) if $help || !$valid_options;
+
+# Retrieve a list of instances matching instance-name
+my @instances= 
+  describe_instances($instance_name, $profile, $region, $filters, $debug);
+my $instance_count = scalar @instances;
+if($list or $instance_count != 1) {
+  # Display matching instances
+  print join("\n", @instances), "\n";
+} 
+else {
+  # Open an ssh connection to matching instance
+  my ($tag_name, $public_dns, $private_dns) = split /\t/, $instances[0];
+  # Connect using the public_dns, if it doesn't exist or if the user set the
+  # private flag then use the private_dns
+  my $hostname 
+    = $public_dns ne 'None' && !$private ? $public_dns 
+    : $private_dns ne 'None' ? $private_dns
+    : undef;
+  if($hostname) {
+    $hostname = "$user\@$hostname" if $user;
+    my $ssh_args = join " ", grep { $_ ne $instance_parts } @ARGV;
+    print STDERR "Connecting to $hostname [$tag_name]\n";
+    print STDERR "\$ ssh $hostname $ssh_args\n" if $debug;
+    exec("ssh $hostname $ssh_args");
+  }
+  else {
+    print STDERR "Matching instance ($tag_name) has no public or private DNS name\n";
+  }
+}
+
+1;
+
+=head1 NAME
+
+ec2ssh - SSH to Amazon EC2 instances via tag name
+
+=head1 SYNOPSIS
+
+ec2ssh [OPTIONS] instance-name [SSH-OPTIONS]
+
+  Options:
+    -? --help     Display this help and exits.
+    -d --debug    Turn on debug logging.
+       --list     Return a list of matching instances.
+       --profile  Use a specific profile from your aws credential file.
+       --region   The region to use, overrides config/env settings.
+       --filters  A list of filters used to match properties for instances. For a complete reference to the available filter keys for this operation, see the Amazon EC2 API reference.
+       --private  Force ssh to connect using the private dns name. 
+
+  SSH-Options
+
+    All ssh options are supported provided they are passed in *AFTER* the instance-name.
+
+  Examples:
+    # SSH to EC2 instance whose name is bowker-imageweb
+    ec2ssh bowker-imageweb
+
+    # SSH to ec2 instance using an identity file
+    ec2ssh bowker-imageweb -i /path/to/identity-file
+
+    # SSH to ec2 instance as a specific 'user'
+    ec2ssh user@bowker-imageweb
+
+    # List all ec2 instances associated with the default profile
+    ec2ssh --list
+
+    # List all ec2 instances that start with the tag name 'bowker'
+    ec2ssh --list bowker*
+
+    # SSH to ec2 instance named bowker-imageweb in a different region
+    ec2ssh --region us-west-2 bowker-imageweb
+
+    # SSH to ec2 instance and execute command 'whoami'
+    ec2ssh bowker-imageweb whoami
+
+    # SSH to ec2 instance that is part of a specific profile (non-default)
+    ec2ssh --profile pqis bowker-imageweb
+
+    # SSH to ec2 instance using it's private DNS name
+    ec2ssh --private bowker-imageweb
+
+=head1 DESCRIPTION
+
+Open an ssh connection to an EC2 instance where <instance-name> equals
+tag:value.  The 'tag:' portion of <instance-name> is optional, and defaults to
+'Name'.  A list of instances will be returned when using the --list parameter
+or if more then one matching instance is found.
+
+All ssh options are supported as long as they are passed in *AFTER* the
+<instance-name>.
+
+Please note, this command wraps the AWS Command Line Interface tool which must
+be installed and configured (http://aws.amazon.com/cli/) prior to it's use.
+Please follow these instructions to install the AWS CLI:
+
+  # Install AWS CLI
+  $ sudo pip install awscli
+
+  # Configure AWS CLI 'default' profile
+  $ aws configure
+
+  # Additional profiles can be configured as follows
+  $ aws configure --profile <profile-name>
+
+=head1 AUTHOR
+
+Peter Williams
+
+=head1 LICENSE
+
+This library is free software; you may redistribute it and/or modify it under
+the same terms as Perl itself.
+
+=cut     
