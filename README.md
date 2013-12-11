@@ -20,8 +20,9 @@ ec2ssh \[OPTIONS\] instance-name \[SSH-OPTIONS\]
     All ssh options are supported provided they are passed in *AFTER* the instance-name.
 
     Examples:
-      # SSH to EC2 instance whose name is bowker-imageweb
-      ec2ssh bowker-imageweb
+    
+    # SSH to EC2 instance whose name is bowker-imageweb
+    ec2ssh bowker-imageweb
 
     # SSH to ec2 instance using an identity file
     ec2ssh bowker-imageweb -i /path/to/identity-file
