@@ -14,14 +14,15 @@ ec2ssh \[OPTIONS\] instance-name \[SSH-OPTIONS\]
          --region   The region to use, overrides config/env settings.
          --filters  A list of filters used to match properties for instances. For a complete reference to the available filter keys for this operation, see the Amazon EC2 API reference.
          --private  Force ssh to connect using the private dns name. 
-         
+    
     SSH-Options
 
     All ssh options are supported provided they are passed in *AFTER* the instance-name.
 
     Examples:
-      # SSH to EC2 instance whose name is bowker-imageweb
-      ec2ssh bowker-imageweb
+
+    # SSH to EC2 instance whose name is bowker-imageweb
+    ec2ssh bowker-imageweb
 
     # SSH to ec2 instance using an identity file
     ec2ssh bowker-imageweb -i /path/to/identity-file
@@ -49,13 +50,13 @@ ec2ssh \[OPTIONS\] instance-name \[SSH-OPTIONS\]
 
 # DESCRIPTION
 
-Open an ssh connection to an EC2 instance where <instance-name> equals
-tag:value.  The 'tag:' portion of <instance-name> is optional, and defaults to
+Open an ssh connection to an EC2 instance where instance-name equals
+tag:value.  The 'tag:' portion of instance-name is optional, and defaults to
 'Name'.  A list of instances will be returned when using the --list parameter
 or if more then one matching instance is found.
 
 All ssh options are supported as long as they are passed in \*AFTER\* the
-<instance-name>.
+instance-name.
 
 Please note, this command wraps the AWS Command Line Interface tool which must
 be installed and configured (http://aws.amazon.com/cli/) prior to it's use.
@@ -75,3 +76,6 @@ Please follow these instructions to install the AWS CLI:
 Peter Williams
 
 # LICENSE
+
+This library is free software; you may redistribute it and/or modify it under
+the same terms as Perl itself.
