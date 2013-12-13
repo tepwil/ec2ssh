@@ -21,32 +21,37 @@ ec2ssh \[OPTIONS\] instance-name \[SSH-OPTIONS\]
 
     Examples:
 
-    # SSH to EC2 instance whose name is bowker-imageweb
-    ec2ssh bowker-imageweb
+    # SSH to ec2 instance whose name is 'nginx1'
+    ec2ssh nginx1
 
     # SSH to ec2 instance using an identity file
-    ec2ssh bowker-imageweb -i /path/to/identity-file
+    ec2ssh nginx1 -i /path/to/identity-file
 
     # SSH to ec2 instance as a specific 'user'
-    ec2ssh user@bowker-imageweb
+    ec2ssh user@nginx1
 
     # List all ec2 instances associated with the default profile
     ec2ssh --list
 
-    # List all ec2 instances that start with the tag name 'bowker'
-    ec2ssh --list bowker*
+    # List all ec2 instances that start with the tag name 'nginx'
+    ec2ssh --list nginx*
 
-    # SSH to ec2 instance named bowker-imageweb in a different region
-    ec2ssh --region us-west-2 bowker-imageweb
+    # List all ec2 instances that have a tag name 'system' with value 'centos'
+    ec2ssh --list system:centos
+
+    # SSH to ec2 instance named nginx1 in a different region
+    ec2ssh --region us-west-2 nginx1
 
     # SSH to ec2 instance and execute command 'whoami'
-    ec2ssh bowker-imageweb whoami
+    ec2ssh nginx1 whoami
 
     # SSH to ec2 instance that is part of a specific profile (non-default)
-    ec2ssh --profile pqis bowker-imageweb
+    ec2ssh --profile pqis nginx1
 
     # SSH to ec2 instance using it's private DNS name
-    ec2ssh --private bowker-imageweb
+    ec2ssh --private nginx1
+
+
 
 # DESCRIPTION
 
