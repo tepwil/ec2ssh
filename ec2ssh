@@ -17,7 +17,7 @@ sub describe_instances {
     : ('Name', $instance_name);
 
   # Assemble instance filters
-  my @filters = ("Name=instance-state-code,Values=16");
+  my @filters = ("Name=instance-state-name,Values=running");
   push @filters, "Name=tag:$tag_name,Values=$tag_value" if $tag_value;
   push @filters, "$filters" if $filters;
 
