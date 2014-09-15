@@ -13,7 +13,7 @@ ec2ssh \[OPTIONS\] instance-name \[SSH-OPTIONS\]
          --profile  Use a specific profile from your aws credential file.
          --region   The region to use, overrides config/env settings.
          --filters  A list of filters used to match properties for instances. For a complete reference to the available filter keys for this operation, see the Amazon EC2 API reference.
-         --private  Force ssh to connect using the private dns name. 
+         --private  Force ssh to connect using the private ip. 
     
     SSH-Options
 

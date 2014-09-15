@@ -36,12 +36,15 @@ sub describe_instances {
   foreach my $reservation (@{$reservations_ref->{Reservations}}) {
     foreach my $instance (@{$reservation->{Instances}}) {
       my $public_dns= $instance->{PublicDnsName} || 'None';
-      my $private_dns= $instance->{PrivateDnsName} || 'None';
+      my $public_ip= $instance->{PublicIpAddress} || 'None';
+      my $private_ip= $instance->{PrivateIpAddress} || 'None';
       my $name = 'None';
       foreach my $tag (@{$instance->{Tags}}) {
-        $name= $tag->{Value} if $tag->{Key} eq 'Name';
+        $name= $tag->{Value}
+          if $tag->{Key} eq 'Name' and defined $tag->{Value};
       }
-      push @instances, join "\t", ($name, $public_dns, $private_dns);
+      push @instances, 
+        join "\t", ($name, $public_dns, $public_ip, $private_ip);
     }
   }
   return @instances;
@@ -89,12 +92,13 @@ if($list or $instance_count != 1) {
 } 
 else {
   # Open an ssh connection to matching instance
-  my ($tag_name, $public_dns, $private_dns) = split /\t/, $instances[0];
+  my ($tag_name, $public_dns, $public_ip, $private_ip)
+    = split /\t/, $instances[0];
   # Connect using the public_dns, if it doesn't exist or if the user set the
-  # private flag then use the private_dns
+  # private flag then use the private_ip
   my $hostname 
     = $public_dns ne 'None' && !$private ? $public_dns 
-    : $private_dns ne 'None' ? $private_dns
+    : $private_ip ne 'None' ? $private_ip
     : undef;
   if($hostname) {
     $hostname = "$user\@$hostname" if $user;
@@ -104,7 +108,7 @@ else {
     exec("ssh $hostname $ssh_args");
   }
   else {
-    print STDERR "Matching instance ($tag_name) has no public or private DNS name\n";
+    print STDERR "Matching instance ($tag_name) has no public DNS name or private IP address\n";
   }
 }
 
@@ -125,7 +129,7 @@ ec2ssh [OPTIONS] instance-name [SSH-OPTIONS]
        --profile  Use a specific profile from your aws credential file.
        --region   The region to use, overrides config/env settings.
        --filters  A list of filters used to match properties for instances. For a complete reference to the available filter keys for this operation, see the Amazon EC2 API reference.
-       --private  Force ssh to connect using the private dns name. 
+       --private  Force ssh to connect using the private ip. 
   
   SSH-Options
 
