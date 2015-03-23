@@ -1,80 +1,138 @@
-# NAME
+# Introduction
 
-ec2ssh - SSH to Amazon EC2 instances via tag name
+ec2ssh is a set of tools that simplifies working with Amazon EC2 instances by
+allowing you to connect to instances via their tag name.
 
-# SYNOPSIS
+# Usage
 
-ec2ssh \[OPTIONS\] instance-name \[SSH-OPTIONS\]
+## ec2host
 
-    Options:
-      -? --help     Display this help and exits.
-      -d --debug    Turn on debug logging.
-         --list     Return a list of matching instances.
-         --profile  Use a specific profile from your aws credential file.
-         --region   The region to use, overrides config/env settings.
-         --filters  A list of filters used to match properties for instances. For a complete reference to the available filter keys for this operation, see the Amazon EC2 API reference.
-         --private  Force ssh to connect using the private ip. 
-    
-    SSH-Options
+### Get a list of all ec2 instances
 
-    All ssh options are supported provided they are passed in *AFTER* the instance-name.
+```
+$ ec2host
+```
 
-    Examples:
+### Get a list of ec2 instances with tag names starting with 'nginx'
 
-    # SSH to ec2 instance whose name is 'nginx1'
-    ec2ssh nginx1
+```
+$ ec2host nginx*
+```
 
-    # SSH to ec2 instance using an identity file
-    ec2ssh nginx1 -i /path/to/identity-file
+### Get a list of ec2 instances in the 'us-west-2' region
 
-    # SSH to ec2 instance as a specific 'user'
-    ec2ssh user@nginx1
+```
+$ ec2host --region us-west-2
+```
 
-    # List all ec2 instances associated with the default profile
-    ec2ssh --list
+### Get a list of ec2 instances that are part of a specific profile (non-default)
 
-    # List all ec2 instances that start with the tag name 'nginx'
-    ec2ssh --list nginx*
+```
+$ ec2host --profile pqis
+```
 
-    # List all ec2 instances that have a tag name 'system' with value 'centos'
-    ec2ssh --list system:centos
+### Get a list of ec2 instances with a tag name 'system' with value of 'centos'
 
-    # SSH to ec2 instance named nginx1 in a different region
-    ec2ssh --region us-west-2 nginx1
+```
+$ ec2host system:centos
+```
 
-    # SSH to ec2 instance and execute command 'whoami'
-    ec2ssh nginx1 whoami
+### Get a list of ec2 instances that are 64 bit
 
-    # SSH to ec2 instance that is part of a specific profile (non-default)
-    ec2ssh --profile pqis nginx1
+```
+$ ec2host --filters Name=architecture,Values=x86_64
+```
 
-    # SSH to ec2 instance using it's private DNS name
-    ec2ssh --private nginx1
+## ec2ssh
 
+### SSH to ec2 instance whose name is nginx1
 
+```
+$ ec2ssh nginx1
+```
 
-# DESCRIPTION
+### SSH to ec2 instance using an identity file
 
-Open an ssh connection to an EC2 instance where instance-name equals
-tag:value.  The 'tag:' portion of instance-name is optional, and defaults to
-'Name'.  A list of instances will be returned when using the --list parameter
-or if more then one matching instance is found.
+```
+$ ec2ssh nginx1 -i /path/to/identify-file
+```
 
-All ssh options are supported as long as they are passed in \*AFTER\* the
-instance-name.
+### SSH to ec2 instance as a specific user
 
-Please note, this command wraps the AWS Command Line Interface tool which must
-be installed and configured (http://aws.amazon.com/cli/) prior to it's use.
+```
+$ ec2ssh user@nginx1
+```
+
+### SSH to ec2 instance in a different region
+
+```
+$ ec2ssh --region us-west-1 nginx1
+```
+
+### SSH to ec2 instance and execute command `whoami`
+
+```
+$ ec2ssh nginx1 whoami
+```
+
+### SSH to ec2 instance that is part of a specific profile (non-default)
+
+```
+$ ec2ssh --profile pqis nginx1
+```
+
+## ec2dns
+
+### Add all ec2 instances to /etc/hosts
+
+```
+$ ec2dns
+```
+
+### Add the private ip address of all ec2 instances to /etc/hosts
+
+```
+$ ec2dns --private
+```
+
+### Add the given prefix to the tag name of each ec2 instance in the given profile to /etc/hosts
+
+```
+$ ec2dns --profile prod --prefix 'prod.'
+```
+
+### Add the availability zone as a suffix to the tag name of each ec2 instance to /etc/hosts
+
+```
+$ ec2dns --suffix_az
+```
+
+# Installation
+
+Simply copy `ec2host`, `ec2ssh` and `ec2dns` to a folder, such as `~/bin`, that
+is defined in your `PATH` environment variable.
+
+The ec2ssh suite wrap the AWS Command Line Interface tool which must be
+installed and configured (http://aws.amazon.com/cli/) prior to it's use.
 Please follow these instructions to install the AWS CLI:
 
-    # Install AWS CLI
-    $ sudo pip install awscli
+### Install AWS CLI
 
-    # Configure AWS CLI 'default' profile
-    $ aws configure
+```
+$ sudo pip install awscli
+```
 
-    # Additional profiles can be configured as follows
-    $ aws configure --profile <profile-name>
+### Configure AWS CLI 'default' profile
+
+```
+$ aws configure
+```
+
+### Additional profiles can be configured as follows
+
+```
+$ aws configure --profile <profile-name>
+```
 
 # AUTHOR
 
