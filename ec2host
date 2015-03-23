@@ -1,0 +1,159 @@
+#!/usr/bin/env perl
+
+use strict;
+use warnings;
+use Getopt::Long qw/:config pass_through/;
+use Pod::Usage;
+use JSON;
+
+sub describe_instances {
+  # Query using the AWS command line interface for a list of ec2 instances
+  # matching an $instance_name where $instance_name=tag:value and the 'tag:'
+  # portion is optional defaulting to 'Name'
+  my ($instance_name, $profile, $region, $filters, $debug, $format)= @_;
+  my ($tag_name, $tag_value)
+    = $instance_name =~ /:/ 
+    ? split /:/, $instance_name
+    : ('Name', $instance_name);
+
+  # Assemble instance filters
+  my @filters = ("Name=instance-state-name,Values=running");
+  push @filters, "Name=tag:$tag_name,Values=$tag_value" if $tag_value;
+  push @filters, "$filters" if $filters;
+
+  # Assemble describe-instance command
+  my $cmd= 
+    "aws ec2 describe-instances --output json --color off --no-paginate";
+  $cmd.= " --filters " . join " ", @filters;
+  $cmd.= " --profile $profile" if $profile;
+  $cmd.= " --region $region" if $region;
+  print STDERR "Describing Instances\n\$ $cmd\n" if $debug;
+ 
+  # Execute describe-instance command
+  my $reservations= `$cmd`;
+  die "External command failed: $cmd" if $?;
+  
+  # Return instances in the requested format
+  my @instances;
+  if($format eq 'json') {
+    push @instances, $reservations;
+  }
+  else {
+    my $reservations_ref = from_json($reservations);
+    foreach my $reservation (@{$reservations_ref->{Reservations}}) {
+      foreach my $instance (@{$reservation->{Instances}}) {
+        my $public_dns= $instance->{PublicDnsName} || 'None';
+        my $public_ip= $instance->{PublicIpAddress} || 'None';
+        my $private_ip= $instance->{PrivateIpAddress} || 'None';
+        my $name = 'None';
+        foreach my $tag (@{$instance->{Tags}}) {
+          $name= $tag->{Value}
+            if $tag->{Key} eq 'Name' and defined $tag->{Value};
+        }
+        push @instances, 
+          join "\t", ($name, $public_dns, $public_ip, $private_ip);
+      }
+    }
+  }
+  return @instances;
+}
+
+my $help          = 0;
+my $valid_options = 0;
+my $debug         = 0;
+my $profile       = '';
+my $region        = '';
+my $filters       = '';
+my $format        = 'text';
+$valid_options= GetOptions(
+  'help|?'    => \$help,
+  'debug|d'   => \$debug,
+  'profile=s' => \$profile,
+  'region=s'  => \$region,
+  'filters=s' => \$filters,
+  'format=s'  => \$format,
+);
+pod2usage(
+  -verbose => 2, 
+  -noperldoc => 1
+) if $help || !$valid_options;
+
+# Parse instance-name
+my $instance_name= $ARGV[0] || '';
+
+# Retrieve a list of instances matching instance-name
+my @instances= describe_instances(
+  $instance_name, $profile, $region, $filters, $debug, $format);
+print join("\n", @instances), "\n";
+
+1;
+
+=head1 NAME
+
+ec2host - Describes one or more of your Amazon EC2 instances
+
+=head1 SYNOPSIS
+
+ec2host [OPTIONS] instance-name
+
+  Options:
+    -? --help     Display this help and exits.
+    -d --debug    Turn on debug logging.
+       --profile  Use a specific profile from your aws credential file.
+       --region   The region to use, overrides config/env settings.
+       --filters  A list of filters used to match properties for instances. For a complete reference to the available filter keys for this operation, see the Amazon EC2 API reference.
+  
+  Examples:
+
+    # Describe all ec2 instances associated with the default profile
+    ec2host
+
+    # Describe the ec2 instance with tag name 'nginx1'
+    ec2host nginx*
+
+    # Describe all ec2 instances that start with the tag name 'nginx'
+    ec2host nginx*
+
+    # Describe all ec2 instances that have a tag name 'system' with value 'centos'
+    ec2host system:centos
+
+    # Describe all ec2 instances in the us-west-2 region
+    ec2host --region us-west-2
+
+    # Describe all ec2 instances that are part of a specific profile (non-default)
+    ec2host --profile pqis
+
+    # Describe all ec2 instances that are 64-bit
+    ec2host --filters Name=architecture,Values=x86_64
+
+=head1 DESCRIPTION
+
+Returns a list containing a description of one or more of your Amazon EC2
+instances.  When run with no parameters all ec2 instances associated will be
+returned.  The optional instance-name parameter can be used to limit the
+returned instances by tag where instance-name equals tag:value. The 'tag:'
+portion of instance-name is optional, and defaults to 'Name'.
+
+Please note, this command wraps the AWS Command Line Interface tool which must
+be installed and configured (http://aws.amazon.com/cli/) prior to it's use.
+Please follow these instructions to install the AWS CLI:
+
+  # Install AWS CLI
+  $ sudo pip install awscli
+
+  # Configure AWS CLI 'default' profile
+  $ aws configure
+
+  # Additional profiles can be configured as follows
+  $ aws configure --profile <profile-name>
+
+=head1 AUTHOR
+
+Peter Williams
+
+=head1 LICENSE
+
+This library is free software; you may redistribute it and/or modify it under
+the same terms as Perl itself.
+
+=cut     
