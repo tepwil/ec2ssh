@@ -62,7 +62,7 @@ else {
     : undef;
   if($hostname) {
     $hostname = "$user\@$hostname" if $user;
-    my $ssh_args = join " ", grep { $_ ne $instance_parts } @ARGV;
+    my $ssh_args = join " ", grep { $_ ne $instance_parts && $_ ne $private_ip } @ARGV;
     print STDERR "Connecting to $hostname [$tag_name]\n";
     print STDERR "\$ ssh $hostname $ssh_args\n" if $debug;
     exec("ssh $hostname $ssh_args");
