@@ -36,7 +36,7 @@ else {
 }
 
 # Retrieve a list of ec2 instances matching provided criteria
-my $cmd= "ec2host $instance_name";
+my $cmd= "ec2host " . qq("$instance_name");
 $cmd.= " --filters $filters" if $filters;
 $cmd.= " --profile $profile" if $profile;
 $cmd.= " --region $region" if $region;

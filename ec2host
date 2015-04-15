@@ -18,7 +18,7 @@ sub describe_instances {
 
   # Assemble instance filters
   my @filters = ("Name=instance-state-name,Values=running");
-  push @filters, "Name=tag:$tag_name,Values=$tag_value" if $tag_value;
+  push @filters, "Name=tag:$tag_name,Values=" . qq("$tag_value") if $tag_value;
   push @filters, "$filters" if $filters;
 
   # Assemble describe-instance command
