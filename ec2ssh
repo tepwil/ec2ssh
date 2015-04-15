@@ -36,7 +36,7 @@ else {
 }
 
 # Retrieve a list of ec2 instances matching provided criteria
-my $cmd= "ec2host $instance_name";
+my $cmd= "ec2host " . qq("$instance_name");
 $cmd.= " --filters $filters" if $filters;
 $cmd.= " --profile $profile" if $profile;
 $cmd.= " --region $region" if $region;
@@ -62,7 +62,7 @@ else {
     : undef;
   if($hostname) {
     $hostname = "$user\@$hostname" if $user;
-    my $ssh_args = join " ", grep { $_ ne $instance_parts } @ARGV;
+    my $ssh_args = join " ", grep { $_ ne $instance_parts && $_ ne $private_ip } @ARGV;
     print STDERR "Connecting to $hostname [$tag_name]\n";
     print STDERR "\$ ssh $hostname $ssh_args\n" if $debug;
     exec("ssh $hostname $ssh_args");
