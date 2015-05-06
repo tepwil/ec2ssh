@@ -36,14 +36,13 @@ else {
 }
 
 # Retrieve a list of ec2 instances matching provided criteria
-my $cmd= "ec2host $instance_name";
-$cmd.= " --filters $filters" if $filters;
-$cmd.= " --profile $profile" if $profile;
-$cmd.= " --region $region" if $region;
-$cmd.= " --debug" if $debug;
-my $reservations= `$cmd`;
-die "External command failed: $cmd" if $?;
-my @instances= split /\n/, $reservations;
+my @cmd= ("ec2host", $instance_name);
+push @cmd, ("--filters", $filters) if $filters;
+push @cmd, ("--profile", $profile) if $profile;
+push @cmd, ("--region", $region) if $region;
+push @cmd, "--debug" if $debug;
+open(my $result, '-|', @cmd) or die "External command failed: $!\n";
+my @instances=  map { chomp; $_; } <$result>;
 
 my $instance_count = scalar @instances;
 if($instance_count != 1) {

@@ -19,19 +19,20 @@ sub describe_instances {
   # Assemble instance filters
   my @filters = ("Name=instance-state-name,Values=running");
   push @filters, "Name=tag:$tag_name,Values=$tag_value" if $tag_value;
-  push @filters, "$filters" if $filters;
+  push @filters, $filters if $filters;
 
   # Assemble describe-instance command
-  my $cmd= 
-    "aws ec2 describe-instances --output json --color off --no-paginate";
-  $cmd.= " --filters " . join " ", @filters;
-  $cmd.= " --profile $profile" if $profile;
-  $cmd.= " --region $region" if $region;
-  print STDERR "Describing Instances\n\$ $cmd\n" if $debug;
+  my @cmd = 
+    (qw/aws ec2 describe-instances --output json --color off --no-paginate/);
+  push @cmd, ("--filters", @filters);
+  push @cmd, ("--profile", $profile) if $profile;
+  push @cmd, ("--region", $region) if $region;
+  printf STDERR "Describing Instances\n\$ %s\n", join(" ", @cmd) if $debug;
  
   # Execute describe-instance command
-  my $reservations= `$cmd`;
-  die "External command failed: $cmd" if $?;
+  open(my $result, '-|', @cmd) or die "External command failed: $!\n";
+  my $reservations = join " ", <$result>;
+  close $result;
   
   # Return instances in the requested format
   my @instances;

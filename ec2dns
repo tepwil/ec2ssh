@@ -36,13 +36,15 @@ my $instance_name= $ARGV[0] || '';
 # Retrieve a list of instances matching provided criteria
 my @instances;
 my $tag_name_ref;
-my $cmd= "ec2host $instance_name --format json";
-$cmd.= " --filters $filters" if $filters;
-$cmd.= " --profile $profile" if $profile;
-$cmd.= " --region $region" if $region;
-$cmd.= " --debug" if $debug;
-my $reservations= `$cmd`;
-die "External command failed: $cmd" if $?;
+my @cmd= ("ec2host", $instance_name);
+push @cmd, ("--format", "json");
+push @cmd, ("--filters", $filters) if $filters;
+push @cmd, ("--profile", $profile) if $profile;
+push @cmd, ("--region", $region) if $region;
+push @cmd, "--debug" if $debug;
+open(my $result, '-|', @cmd) or die "External command failed: $!\n";
+my $reservations = join " ", <$result>;
+close $result;
 
 # Build a list of ip and tag names to add to /etc/hosts
 my $reservations_ref = from_json($reservations);
