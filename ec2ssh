@@ -42,7 +42,7 @@ push @cmd, ("--profile", $profile) if $profile;
 push @cmd, ("--region", $region) if $region;
 push @cmd, "--debug" if $debug;
 open(my $result, '-|', @cmd) or die "External command failed: $!\n";
-my @instances=  map { chomp; $_; } <$result>;
+my @instances= grep { defined && length > 0 } map { chomp; $_; } <$result>;
 
 my $instance_count = scalar @instances;
 if($instance_count != 1) {
