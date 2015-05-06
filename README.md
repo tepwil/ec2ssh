@@ -81,6 +81,12 @@ SSH to ec2 instance that is part of a specific profile (non-default)
 $ ec2ssh --profile pqis nginx1
 ```
 
+SSH to ec2 instance using it's private ip
+
+```
+$ ec2ssh --private nginx1
+```
+
 ## ec2dns
 
 Add all ec2 instances to /etc/hosts
