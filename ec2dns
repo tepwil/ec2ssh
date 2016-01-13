@@ -9,7 +9,7 @@ use JSON;
 my $help          = 0;
 my $valid_options = 0;
 my $debug         = 0;
-my $profile       = '';
+my $profile       = 'default';
 my $region        = '';
 my $filters       = '';
 my $private       = 0;
@@ -92,10 +92,10 @@ my @hosts;
 open my $fh, "<", "/etc/hosts" or die "Failed to open '/etc/hosts': $!";
 while (<$fh> ) {
   chomp;
-  if(m/^### ec2dns hosts start$/) {
+  if(m/^### ec2dns hosts start: $profile$/) {
     $ec2dns_marker = 1;
   }
-  elsif(m/^### ec2dns hosts end$/) {
+  elsif(m/^### ec2dns hosts end: $profile$/) {
     $ec2dns_marker = 0;
   }
   else {
@@ -105,9 +105,9 @@ while (<$fh> ) {
 close $fh;
 
 # Add list of matching ec2 instances to hosts array
-push @hosts, "### ec2dns hosts start";
+push @hosts, "### ec2dns hosts start: $profile";
 push @hosts, $_ foreach @instances;
-push @hosts, "### ec2dns hosts end";
+push @hosts, "### ec2dns hosts end: $profile";
 
 # Write out new hosts file. Since /etc/hosts is usually owned by root the hosts
 # file will be written to a temp file and then moved via sudo to /etc/hosts.
