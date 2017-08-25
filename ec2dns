@@ -15,6 +15,7 @@ my $filters       = '';
 my $private       = 0;
 my $prefix        = '';
 my $suffix_az     = 0;
+my $hosts_file    = '/etc/hosts';
 $valid_options= GetOptions(
   'help|?'    => \$help,
   'debug|d'   => \$debug,
@@ -24,6 +25,7 @@ $valid_options= GetOptions(
   'private'   => \$private,
   'prefix=s'  => \$prefix,
   'suffix_az' => \$suffix_az,
+  'hosts=s'   => \$hosts_file,
 );
 pod2usage(
   -verbose => 2, 
@@ -46,7 +48,7 @@ open(my $result, '-|', @cmd) or die "External command failed: $!\n";
 my $reservations = join " ", <$result>;
 close $result;
 
-# Build a list of ip and tag names to add to /etc/hosts
+# Build a list of ip and tag names to add to hosts file
 my $reservations_ref = from_json($reservations);
 foreach my $reservation (@{$reservations_ref->{Reservations}}) {
   LOOP: foreach my $instance (@{$reservation->{Instances}}) {
@@ -60,7 +62,7 @@ foreach my $reservation (@{$reservations_ref->{Reservations}}) {
     }
     next LOOP unless $tag_name;
     
-    # The default is to use instance's public ip for saving in /etc/hosts. If
+    # The default is to use instance's public ip for saving in hosts. If
     # the public_ip doesn't exist or if the user set the private flag then use
     # the private_ip
     my $ip
@@ -89,7 +91,7 @@ foreach my $reservation (@{$reservations_ref->{Reservations}}) {
 # ec2dns
 my $ec2dns_marker;
 my @hosts;
-open my $fh, "<", "/etc/hosts" or die "Failed to open '/etc/hosts': $!";
+open my $fh, "<", "$hosts_file" or die "Failed to open '$hosts_file': $!";
 while (<$fh> ) {
   chomp;
   if(m/^### ec2dns hosts start: $profile$/) {
@@ -109,17 +111,23 @@ push @hosts, "### ec2dns hosts start: $profile";
 push @hosts, $_ foreach @instances;
 push @hosts, "### ec2dns hosts end: $profile";
 
-# Write out new hosts file. Since /etc/hosts is usually owned by root the hosts
-# file will be written to a temp file and then moved via sudo to /etc/hosts.
-open $fh, ">", "/tmp/ec2dns_hosts"
-  or die "Failed to open '/tmp/ec2dns_hosts' for write: $!";
+# Write out hosts file
+#
+# Since the hosts file (default: /etc/hosts) might be owned by root the new
+# hosts will be written to a temp file and then copied over (conditionally by
+# sudo if the current user does not have write access)
+my $temp_hosts_file = "/tmp/ec2dns_hosts";
+open $fh, ">", $temp_hosts_file
+  or die "Failed to open '$temp_hosts_file' for write: $!";
 print {$fh} join("\n", @hosts)
-  or die "Failed to write '/tmp/ec2dns_hosts': $!";
-close $fh or die "Failed to close '/tmp/ec2dns_hosts': $!";
-system("sudo mv /tmp/ec2dns_hosts /etc/hosts") == 0
-  or die "Failed saving hosts in /etc/hosts: $!";
+  or die "Failed to write '$temp_hosts_file': $!";
+close $fh or die "Failed to close '$temp_hosts_file': $!";
+my @copy_cmd = ("cp", $temp_hosts_file, $hosts_file);
+unshift @copy_cmd, "sudo" if ! -w $hosts_file;
+system(@copy_cmd) == 0 or die "Failed saving hosts in '$hosts_file': $!";
+unlink $temp_hosts_file;
 
-printf STDERR "Added %s ec2 instances to /etc/hosts\n", scalar @instances;
+printf STDERR "Added %s ec2 instances to $hosts_file\n", scalar @instances;
 
 1;
 
@@ -140,13 +148,14 @@ ec2dns [OPTIONS] instance-name
        --private    Force ec2dns to update /etc/hosts with each instance's private ip address.
        --prefix     Adds a prefix to the tag name in /etc/hosts.
        --suffix_az  Adds the ec2 instance's availability zone as a suffix to the tag name, such as '.us-east-1a'.
+       --hosts      The full path to the hosts file to be updated (default: /etc/hosts).
   
   Examples:
     
     # Adds all ec2 instances associated with the default aws profile to /etc/hosts
     ec2dns 
     
-    # Adds the private ip address of all ec2 instances to /ect/hosts
+    # Adds the private ip address of all ec2 instances to /etc/hosts
     ec2dns --private
 
     # Adds all ec2 instances whose tag name starts with nginx to /etc/hosts
@@ -158,21 +167,32 @@ ec2dns [OPTIONS] instance-name
     # Adds all ec2 instances such that the hostname will be suffixed with the availability zone the instance is located in (nginx1 => nginx1.us-east-1a).
     ec2dns --suffix_az
 
-    # Adds all ec2 instances that are part of a specific aws profile (non-default) to /ect/hosts
+    # Adds all ec2 instances that are part of a specific aws profile (non-default) to /etc/hosts
     ec2dns --profile prod
 
     # Adds all ec2 instances that are part of a specific aws profile and applies a prefix to the hostname (nginx1 => prod.nginx1).
     ec2dns --profile prod --prefix "prod."
 
+    # Adds all ec2 instances that are part of multiple aws profiles and applies an appropriate prefix for each
+    ec2dns --profile prod --prefix "prod." && ec2dns --profile test --prefix "test."
+
+    # Adds all ec2 instances to a specific file
+    ec2dns --hosts /etc/hosts.d/ec2
+
 =head1 DESCRIPTION
 
 Adds your Amazon EC2 instances to /etc/hosts so that your machine can resolve
 ec2 instances by tag name directly. Any existing entries in /etc/hosts that
-weren't added with this program are preserved. The ec2 instances that were
-previously added via this program will be removed and replaced every time this
-program is executed. Since /etc/hosts is typically owned by root, this program
-uses sudo internally to write to /etc/hosts. Therefore, this program must be
-run by a user who has been granted sudo access.
+weren't added with this program are preserved. The ec2 instances contained
+within an aws profile that were previously added via this program will be
+removed and replaced every time this program is executed. Note, this program
+can store instances from multiple aws profiles in /etc/hosts through the use of
+the --profile option. If the user running this program does not have access to
+write /etc/hosts, the program will internally use sudo to perform the write.
+Therefore, this program must be run by a user who has access to write
+/etc/hosts or has been granted sudo access. Alternatively, the --hosts option
+can be used to instruct this program to write hosts to a specific file other
+then /etc/hosts.
 
 Note, it's possible that your aws account has more than one instance with the
 same tag name. When this occurs, only the first instance will be saved to
