@@ -4,7 +4,6 @@ use strict;
 use warnings;
 use Getopt::Long qw/:config pass_through/;
 use Pod::Usage;
-use JSON;
 
 my $help          = 0;
 my $valid_options = 0;
@@ -39,53 +38,42 @@ my $instance_name= $ARGV[0] || '';
 my @instances;
 my $tag_name_ref;
 my @cmd= ("ec2host", $instance_name);
-push @cmd, ("--format", "json");
 push @cmd, ("--filters", $filters) if $filters;
 push @cmd, ("--profile", $profile) if $profile;
 push @cmd, ("--region", $region) if $region;
 push @cmd, "--debug" if $debug;
 open(my $result, '-|', @cmd) or die "External command failed: $!\n";
-my $reservations = join " ", <$result>;
-close $result;
+LOOP: while(my $line = <$result>) {
+  chomp $line;
+  my ($tag_name, undef, $public_ip, $private_ip, undef, $availability_zone)
+    = split /\t/, $line;
 
-# Build a list of ip and tag names to add to hosts file
-my $reservations_ref = from_json($reservations);
-foreach my $reservation (@{$reservations_ref->{Reservations}}) {
-  LOOP: foreach my $instance (@{$reservation->{Instances}}) {
-    my $public_ip= $instance->{PublicIpAddress} || 'None';
-    my $private_ip= $instance->{PrivateIpAddress} || 'None';
-    my $availability_zone = $instance->{Placement}->{AvailabilityZone};
-    my $tag_name;
-    foreach my $tag (@{$instance->{Tags}}) {
-      $tag_name= $tag->{Value}
-        if $tag->{Key} eq 'Name' and defined $tag->{Value};
-    }
-    next LOOP unless $tag_name;
+  next LOOP unless $tag_name;
     
-    # The default is to use instance's public ip for saving in hosts. If
-    # the public_ip doesn't exist or if the user set the private flag then use
-    # the private_ip
-    my $ip
-      = $public_ip ne 'None' && !$private ? $public_ip
-      : $private_ip ne 'None' ? $private_ip
-      : undef;
-    if($ip) {
-      $tag_name = sprintf("%s%s", $prefix, $tag_name) if $prefix;
-      $tag_name = sprintf("%s.%s", $tag_name, $availability_zone)
-        if $suffix_az;
+  # The default is to use instance's public ip for saving in hosts. If
+  # the public_ip doesn't exist or if the user set the private flag then use
+  # the private_ip
+  my $ip
+    = $public_ip ne 'None' && !$private ? $public_ip
+    : $private_ip ne 'None' ? $private_ip
+    : undef;
+  if($ip) {
+    $tag_name = sprintf("%s%s", $prefix, $tag_name) if $prefix;
+    $tag_name = sprintf("%s.%s", $tag_name, $availability_zone)
+      if $suffix_az;
 
-      # Add ip and tag name to instances array only if the tag name doesn't
-      # already exist
-      if(! exists $tag_name_ref->{$tag_name}) {
-        push @instances, "$ip\t$tag_name";
-        $tag_name_ref->{$tag_name}= 1;
-      }
-      else {
-        print STDERR "Skipping '$tag_name' [$ip] as tag name already exists\n";
-      }
+    # Add ip and tag name to instances array only if the tag name doesn't
+    # already exist
+    if(! exists $tag_name_ref->{$tag_name}) {
+      push @instances, "$ip\t$tag_name";
+      $tag_name_ref->{$tag_name}= 1;
+    }
+    else {
+      print STDERR "Skipping '$tag_name' [$ip] as tag name already exists\n";
     }
   }
 }
+close $result;
 
 # Parse list of hosts currently defined in hosts file that weren't added via
 # ec2dns

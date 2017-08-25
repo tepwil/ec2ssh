@@ -4,13 +4,12 @@ use strict;
 use warnings;
 use Getopt::Long qw/:config pass_through/;
 use Pod::Usage;
-use JSON;
 
 sub describe_instances {
   # Query using the AWS command line interface for a list of ec2 instances
   # matching an $instance_name where $instance_name=tag:value and the 'tag:'
   # portion is optional defaulting to 'Name'
-  my ($instance_name, $profile, $region, $filters, $debug, $format)= @_;
+  my ($instance_name, $profile, $region, $filters, $debug)= @_;
   my ($tag_name, $tag_value)
     = $instance_name =~ /:/ 
     ? split /:/, $instance_name
@@ -23,47 +22,25 @@ sub describe_instances {
 
   # Assemble describe-instance command
   my @cmd = 
-    (qw/aws ec2 describe-instances --output json --color off --no-paginate/);
+    (qw/aws ec2 describe-instances --output text --color off --no-paginate/);
+  push @cmd, ("--query",
+    "Reservations[*].Instances[*].[Tags[?Key==`Name`] | [0].Value, " .
+    "PublicDNSName, " .
+    "PublicIpAddress, " .
+    "PrivateIpAddress, " .
+    "InstanceId, " .
+    "Placement.AvailabilityZone]");
   push @cmd, ("--filters", @filters);
   push @cmd, ("--profile", $profile) if $profile;
   push @cmd, ("--region", $region) if $region;
   printf STDERR "Describing Instances\n\$ %s\n", join(" ", @cmd) if $debug;
  
   # Execute describe-instance command
+  my @instances;
   open(my $result, '-|', @cmd) or die "External command failed: $!\n";
-  my $reservations = join " ", <$result>;
+  push @instances, <$result>;
   close $result;
   
-  # Return instances in the requested format
-  my @instances;
-  if($format eq 'json') {
-    push @instances, $reservations;
-  }
-  else {
-    my $reservations_ref = from_json($reservations);
-    foreach my $reservation (@{$reservations_ref->{Reservations}}) {
-      foreach my $instance (@{$reservation->{Instances}}) {
-        my $public_dns= $instance->{PublicDnsName} || 'None';
-        my $public_ip= $instance->{PublicIpAddress} || 'None';
-        my $private_ip= $instance->{PrivateIpAddress} || 'None';
-        my $name = 'None';
-        foreach my $tag (@{$instance->{Tags}}) {
-          $name= $tag->{Value}
-            if $tag->{Key} eq 'Name' and defined $tag->{Value};
-        }
-        my $availability_zone=
-          $instance->{Placement}->{AvailabilityZone} || 'None';
-        my $instance_id= $instance->{InstanceId} || 'None';
-        push @instances, join "\t", (
-          $name,
-          $public_dns,
-          $public_ip,
-          $private_ip,
-          $instance_id,
-          $availability_zone);
-      }
-    }
-  }
   return @instances;
 }
 
@@ -73,14 +50,12 @@ my $debug         = 0;
 my $profile       = '';
 my $region        = '';
 my $filters       = '';
-my $format        = 'text';
 $valid_options= GetOptions(
   'help|?'    => \$help,
   'debug|d'   => \$debug,
   'profile=s' => \$profile,
   'region=s'  => \$region,
   'filters=s' => \$filters,
-  'format=s'  => \$format,
 );
 pod2usage(
   -verbose => 2, 
@@ -92,8 +67,8 @@ my $instance_name= $ARGV[0] || '';
 
 # Retrieve a list of instances matching instance-name
 my @instances= describe_instances(
-  $instance_name, $profile, $region, $filters, $debug, $format);
-print join("\n", @instances), "\n";
+  $instance_name, $profile, $region, $filters, $debug);
+print @instances;
 
 1;
 
