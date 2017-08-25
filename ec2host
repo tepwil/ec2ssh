@@ -51,8 +51,16 @@ sub describe_instances {
           $name= $tag->{Value}
             if $tag->{Key} eq 'Name' and defined $tag->{Value};
         }
-        push @instances, 
-          join "\t", ($name, $public_dns, $public_ip, $private_ip);
+        my $availability_zone=
+          $instance->{Placement}->{AvailabilityZone} || 'None';
+        my $instance_id= $instance->{InstanceId} || 'None';
+        push @instances, join "\t", (
+          $name,
+          $public_dns,
+          $public_ip,
+          $private_ip,
+          $instance_id,
+          $availability_zone);
       }
     }
   }
